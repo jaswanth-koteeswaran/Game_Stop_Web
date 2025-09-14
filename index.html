@@ -6,6 +6,7 @@
     <title>Game Stop - The Vanguard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="send-mail.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
         /* General Styles */
@@ -1031,7 +1032,11 @@
         }
         
         async function sendEndOfDayReport() {
+            console.log('sendEndOfDayReport function called');
+            console.log('History length:', history.length);
+            
             if (history.length === 0) {
+                console.log('No history to send');
                 showNotification("No history to send.");
                 return;
             }
@@ -1039,34 +1044,34 @@
             const csvContent = "Type,Customer,Details,Price,PaymentMethod,StartTime,EndTime,Duration\n" + 
                                history.map(r => `"${r.type}","${r.customer}","${r.details}","${r.price.toFixed(2)}","${r.paymentMethod}","${r.startTime}","${r.endTime}","${r.duration}"`).join("\n");
             
-            const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+            const today = new Date().toLocaleDateString('en-CA');
 
             try {
-                const response = await fetch('/.netlify/functions/send-report', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ csvContent, today })
-                });
-
-                if (response.ok) {
+                console.log('Sending email using imported function...');
+                
+                // Call the imported sendMail function directly
+                const result = await sendMail(csvContent, today);
+                
+                if (result.success) {
                     showNotification("Daily report sent successfully!");
                     history = [];
                     localStorage.removeItem('pendingBookings');
                     renderPendingBookings();
-                } else {
-                    const errorData = await response.json();
-                    showNotification(`Error sending email: ${errorData.message || 'Check function logs'}`);
-                    console.error('Email sending failed:', errorData);
                 }
+                
             } catch (error) {
-                showNotification("Failed to send report. Check console.");
-                console.error('Network Error:', error);
+                showNotification(`Failed to send report: ${error.message}`);
+                console.error('Email sending failed:', error);
             }
         }
         
         endOfDayBtn.addEventListener('click', () => {
-             if (confirm("Are you sure you want to send the daily report and reset all data? This action cannot be undone.")) {
+            console.log('End of day button clicked');
+            if (confirm("Are you sure you want to send the daily report and reset all data? This action cannot be undone.")) {
+                console.log('User confirmed, calling sendEndOfDayReport()');
                 sendEndOfDayReport();
+            } else {
+                console.log('User cancelled the operation');
             }
         });
     }

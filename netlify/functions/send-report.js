@@ -2,22 +2,34 @@
 // It keeps your API token secure.
 
 exports.handler = async function(event, context) {
+    console.log('Function called with method:', event.httpMethod);
+    console.log('Event body:', event.body);
+    
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: 'Method Not Allowed' };
+        console.log('Method not allowed:', event.httpMethod);
+        return { 
+            statusCode: 405, 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Method Not Allowed', receivedMethod: event.httpMethod })
+        };
     }
 
     try {
         const { csvContent, today } = JSON.parse(event.body);
         
-        // Securely get the API token and email addresses from environment variables set in your Netlify dashboard
-        const MAILERSEND_API_TOKEN = process.env.MAILERSEND_API_TOKEN;
-        const REPORT_EMAIL_ADDRESS = process.env.REPORT_EMAIL_ADDRESS;
-        const SENDER_EMAIL_ADDRESS = process.env.SENDER_EMAIL_ADDRESS;
+        // Use your actual MailerSend credentials
+        const MAILERSEND_API_TOKEN = 'mlsn.0c6f1284618b67133e4b52375860f56c1e1bf37054124edd5148390e7450cd17';
+        const REPORT_EMAIL_ADDRESS = 'gamestopchennai@gmail.com';
+        const SENDER_EMAIL_ADDRESS = 'gamestopchennai@gmail.com';
 
-        // Check if the necessary secrets are configured in Netlify
+        // Validate credentials
         if (!MAILERSEND_API_TOKEN || !REPORT_EMAIL_ADDRESS || !SENDER_EMAIL_ADDRESS) {
-             return { statusCode: 500, body: 'Server configuration error: Missing environment variables in Netlify.' };
+             return { 
+                 statusCode: 500, 
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({ error: 'Server configuration error: Missing email credentials.' })
+             };
         }
 
         // Convert the CSV text content to Base64, which is required by the MailerSend API for attachments
@@ -50,12 +62,17 @@ exports.handler = async function(event, context) {
         if (!response.ok) {
             const errorData = await response.json();
             console.error('MailerSend API Error:', errorData);
-            return { statusCode: response.status, body: JSON.stringify(errorData) };
+            return { 
+                statusCode: response.status, 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(errorData) 
+            };
         }
 
         // If successful, send a success message back to the admin panel
         return {
             statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: "Email sent successfully!" })
         };
 
@@ -63,6 +80,7 @@ exports.handler = async function(event, context) {
         console.error('Function Error:', error);
         return {
             statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: "An internal server error occurred." })
         };
     }
