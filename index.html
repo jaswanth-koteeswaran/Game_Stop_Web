@@ -6,6 +6,9 @@
     <title>Game Stop - The Vanguard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="config.js"></script>
+    <script src="google-drive.js"></script>
     <script src="send-mail.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -269,7 +272,13 @@
         <div class="max-w-7xl mx-auto ">
             <header class="flex justify-between items-center mb-8">
                 <button id="show-customer-link" class="text-indigo-400 hover:text-indigo-300">← Back to Customer Site</button>
-                <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white">Game Stop - Admin Panel</h1>
+                <div class="text-center">
+                    <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white">Game Stop - Admin Panel</h1>
+                    <div id="storage-status" class="text-sm text-gray-400 mt-1">
+                        <span id="storage-indicator" class="inline-block w-2 h-2 rounded-full bg-yellow-500 mr-2"></span>
+                        <span id="storage-text">Initializing storage...</span>
+                    </div>
+                </div>
                 <button id="logout-btn" class="admin-btn admin-btn-danger">Logout</button>
             </header>
             <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -648,6 +657,7 @@
         let nextSessionId = 1;
         let nextOrderId = 1;
         let synth;
+        let isGoogleDriveInitialized = false;
 
         const gameBookingForm = document.getElementById('game-booking-form');
         const foodOrderForm = document.getElementById('food-order-form');
@@ -666,6 +676,177 @@
         const endOfDayBtn = document.getElementById('end-of-day-btn');
         
         document.body.addEventListener('click', () => { if (!synth) synth = new Tone.Synth().toDestination(); }, { once: true });
+        
+        // Initialize Google Drive
+        async function initializeGoogleDrive() {
+            try {
+                console.log('🔄 Initializing Google Drive...');
+                updateStorageStatus('loading', 'Initializing storage...');
+                
+                const initialized = await googleDriveManager.initialize();
+                if (initialized) {
+                    isGoogleDriveInitialized = true;
+                    console.log('✅ Google Drive initialized successfully');
+                    updateStorageStatus('google-drive');
+                    await loadHistoryFromDrive();
+                } else {
+                    console.log('❌ Google Drive initialization failed - using local storage fallback');
+                    updateStorageStatus('local-storage');
+                    showNotification('Google Drive not available. Using local storage fallback.');
+                    await loadHistoryFromLocalStorage();
+                }
+            } catch (error) {
+                console.error('❌ Google Drive error:', error);
+                updateStorageStatus('error', 'Storage error');
+                showNotification('Google Drive error. Using local storage fallback.');
+                await loadHistoryFromLocalStorage();
+            }
+        }
+
+        // Load history from local storage (fallback)
+        async function loadHistoryFromLocalStorage() {
+            try {
+                const storedHistory = localStorage.getItem('gamestopHistory');
+                if (storedHistory) {
+                    history = JSON.parse(storedHistory);
+                    console.log('✅ History loaded from local storage:', history.length, 'records');
+                    showNotification(`Loaded ${history.length} records from local storage`);
+                } else {
+                    history = [];
+                    console.log('📁 No history found in local storage');
+                    showNotification('No history data available');
+                }
+            } catch (error) {
+                console.error('❌ Failed to load history from local storage:', error);
+                history = [];
+            }
+        }
+
+        // Save history to local storage (fallback)
+        async function saveHistoryToLocalStorage() {
+            try {
+                localStorage.setItem('gamestopHistory', JSON.stringify(history));
+                console.log('✅ History saved to local storage');
+                return true;
+            } catch (error) {
+                console.error('❌ Failed to save history to local storage:', error);
+                return false;
+            }
+        }
+
+        // Load history from Google Drive
+        async function loadHistoryFromDrive() {
+            try {
+                if (!isGoogleDriveInitialized) return;
+                
+                const today = new Date().toLocaleDateString('en-CA');
+                const filename = `gamestop_history_${today}.csv`;
+                
+                console.log('📥 Loading history from Google Drive:', filename);
+                const csvContent = await googleDriveManager.downloadHistory(filename);
+                
+                if (csvContent) {
+                    // Parse CSV and populate history array
+                    const lines = csvContent.split('\n');
+                    history = [];
+                    
+                    for (let i = 1; i < lines.length; i++) { // Skip header
+                        const line = lines[i].trim();
+                        if (line) {
+                            const [type, customer, details, price, paymentMethod, startTime, endTime, duration] = line.split(',');
+                            history.push({
+                                type: type.replace(/"/g, ''),
+                                customer: customer.replace(/"/g, ''),
+                                details: details.replace(/"/g, ''),
+                                price: parseFloat(price.replace(/"/g, '')),
+                                paymentMethod: paymentMethod.replace(/"/g, ''),
+                                startTime: startTime.replace(/"/g, ''),
+                                endTime: endTime.replace(/"/g, ''),
+                                duration: duration.replace(/"/g, '')
+                            });
+                        }
+                    }
+                    
+                    console.log('✅ History loaded from Google Drive:', history.length, 'records');
+                    showNotification(`Loaded ${history.length} records from Google Drive`);
+                } else {
+                    console.log('📁 No history file found in Google Drive');
+                    history = [];
+                    showNotification('No history data available');
+                }
+            } catch (error) {
+                console.error('❌ Failed to load history from Google Drive:', error);
+                history = [];
+            }
+        }
+
+        // Save history to Google Drive (with local storage fallback)
+        async function saveHistoryToDrive() {
+            try {
+                if (history.length === 0) {
+                    console.log('📝 No history to save');
+                    return true;
+                }
+
+                // Try Google Drive first
+                if (isGoogleDriveInitialized) {
+                    const today = new Date().toLocaleDateString('en-CA');
+                    const filename = `gamestop_history_${today}.csv`;
+                    
+                    // Create CSV content
+                    const csvContent = "Type,Customer,Details,Price,PaymentMethod,StartTime,EndTime,Duration\n" + 
+                                       history.map(r => `"${r.type}","${r.customer}","${r.details}","${r.price.toFixed(2)}","${r.paymentMethod}","${r.startTime}","${r.endTime}","${r.duration}"`).join("\n");
+
+                    console.log('💾 Saving history to Google Drive:', filename);
+                    const fileId = await googleDriveManager.uploadHistory(csvContent, filename);
+                    
+                    if (fileId) {
+                        console.log('✅ History saved to Google Drive:', fileId);
+                        showNotification('History saved to Google Drive');
+                        return true;
+                    } else {
+                        console.log('❌ Failed to save to Google Drive, falling back to local storage');
+                    }
+                }
+
+                // Fallback to local storage
+                console.log('💾 Saving history to local storage (fallback)');
+                const saved = await saveHistoryToLocalStorage();
+                if (saved) {
+                    showNotification('History saved to local storage');
+                    return true;
+                } else {
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Failed to save history:', error);
+                // Try local storage as last resort
+                return await saveHistoryToLocalStorage();
+            }
+        }
+
+        // Update storage status indicator
+        function updateStorageStatus(status, message) {
+            const indicator = document.getElementById('storage-indicator');
+            const text = document.getElementById('storage-text');
+            
+            if (status === 'google-drive') {
+                indicator.className = 'inline-block w-2 h-2 rounded-full bg-green-500 mr-2';
+                text.textContent = 'Google Drive connected';
+            } else if (status === 'local-storage') {
+                indicator.className = 'inline-block w-2 h-2 rounded-full bg-yellow-500 mr-2';
+                text.textContent = 'Using local storage';
+            } else if (status === 'error') {
+                indicator.className = 'inline-block w-2 h-2 rounded-full bg-red-500 mr-2';
+                text.textContent = message || 'Storage error';
+            } else {
+                indicator.className = 'inline-block w-2 h-2 rounded-full bg-gray-500 mr-2';
+                text.textContent = message || 'Unknown status';
+            }
+        }
+
+        // Initialize Google Drive when admin view loads
+        initializeGoogleDrive();
         
         adminGameSelect.innerHTML = '<option value="" disabled selected>Choose a game...</option>';
         gamesData.forEach(game => {
@@ -992,7 +1173,7 @@
             }
         });
 
-        function addToHistory(item) {
+        async function addToHistory(item) {
             const record = {
                 type: item.game ? 'Game Session' : 'Food Order',
                 customer: item.customerName,
@@ -1004,7 +1185,11 @@
                 paymentMethod: item.paymentMethod || 'N/A'
             };
             history.push(record);
-            showNotification(`${record.type} for ${record.customer} moved to history.`);
+            
+            // Save to Google Drive
+            await saveHistoryToDrive();
+            
+            showNotification(`${record.type} for ${record.customer} moved to history and saved to Google Drive.`);
         }
 
         function exportHistoryToCSV() {
@@ -1033,30 +1218,41 @@
         
         async function sendEndOfDayReport() {
             console.log('sendEndOfDayReport function called');
-            console.log('History length:', history.length);
             
-            if (history.length === 0) {
-                console.log('No history to send');
-                showNotification("No history to send.");
-                return;
-            }
-
-            const csvContent = "Type,Customer,Details,Price,PaymentMethod,StartTime,EndTime,Duration\n" + 
-                               history.map(r => `"${r.type}","${r.customer}","${r.details}","${r.price.toFixed(2)}","${r.paymentMethod}","${r.startTime}","${r.endTime}","${r.duration}"`).join("\n");
-            
-            const today = new Date().toLocaleDateString('en-CA');
-
             try {
-                console.log('Sending email using imported function...');
+                // Load latest history from Google Drive
+                await loadHistoryFromDrive();
+                
+                if (history.length === 0) {
+                    console.log('No history to send');
+                    showNotification("No history data available in Google Drive.");
+                    return;
+                }
+
+                const csvContent = "Type,Customer,Details,Price,PaymentMethod,StartTime,EndTime,Duration\n" + 
+                                   history.map(r => `"${r.type}","${r.customer}","${r.details}","${r.price.toFixed(2)}","${r.paymentMethod}","${r.startTime}","${r.endTime}","${r.duration}"`).join("\n");
+                
+                const today = new Date().toLocaleDateString('en-CA');
+
+                console.log('Sending email with data from Google Drive...');
                 
                 // Call the imported sendMail function directly
                 const result = await sendMail(csvContent, today);
                 
                 if (result.success) {
                     showNotification("Daily report sent successfully!");
+                    
+                    // Clear local history after successful send
                     history = [];
+                    
+                    // Clear pending bookings
                     localStorage.removeItem('pendingBookings');
                     renderPendingBookings();
+                    
+                    // Clean up old files from Google Drive
+                    if (isGoogleDriveInitialized) {
+                        await googleDriveManager.cleanupOldFiles();
+                    }
                 }
                 
             } catch (error) {
