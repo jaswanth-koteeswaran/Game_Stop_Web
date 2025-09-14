@@ -1,51 +1,97 @@
-// Direct MailerSend email sending function (imported logic from send-report.js)
+// SendPulse email sending function
 async function sendMail(csvContent, today) {
-    // MailerSend credentials
-    const MAILERSEND_API_TOKEN = 'mlsn.0c6f1284618b67133e4b52375860f56c1e1bf37054124edd5148390e7450cd17';
+    // SendPulse credentials
+    const SENDPULSE_CLIENT_ID = 'c41b215ee7fb7901f1c47faa1852c2c8';
+    const SENDPULSE_CLIENT_SECRET = '455a2b890090f082a919668f093c52e8';
     const REPORT_EMAIL_ADDRESS = 'gamestopchennai@gmail.com';
     const SENDER_EMAIL_ADDRESS = 'gamestopchennai@gmail.com';
     
     try {
-        console.log('Sending email directly via MailerSend API...');
+        console.log('Sending email via SendPulse API...');
         
-        // Convert the CSV text content to Base64, which is required by the MailerSend API for attachments
+        // Step 1: Get access token from SendPulse
+        const tokenResponse = await fetch('https://api.sendpulse.com/oauth/access_token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                grant_type: 'client_credentials',
+                client_id: SENDPULSE_CLIENT_ID,
+                client_secret: SENDPULSE_CLIENT_SECRET
+            })
+        });
+
+        if (!tokenResponse.ok) {
+            throw new Error(`Failed to get access token: ${tokenResponse.status}`);
+        }
+
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+        
+        console.log('Access token obtained successfully');
+
+        // Step 2: Convert CSV to Base64 for attachment
         const base64Csv = btoa(csvContent);
         
-        // Prepare the email payload in the format MailerSend expects
+        // Step 3: Prepare email payload for SendPulse SMTP service
         const emailPayload = {
-            from: { email: SENDER_EMAIL_ADDRESS, name: "Game Stop Daily Report" },
-            to: [{ email: REPORT_EMAIL_ADDRESS }],
-            subject: `Game Stop Daily Report - ${today}`,
-            text: "Please find the daily activity report attached.",
-            html: "<p>Please find the daily activity report attached.</p>",
-            attachments: [{
-                filename: `gamestop_history_${today}.csv`,
-                content: base64Csv
-            }]
+            email: {
+                subject: `Game Stop Daily Report - ${today}`,
+                from: {
+                    name: "Game Stop Daily Report",
+                    email: SENDER_EMAIL_ADDRESS
+                },
+                to: [
+                    {
+                        name: "Game Stop Management",
+                        email: REPORT_EMAIL_ADDRESS
+                    }
+                ],
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #eab308;">Game Stop Daily Report</h2>
+                        <p>Dear Team,</p>
+                        <p>Please find the daily activity report attached.</p>
+                        <ul>
+                            <li><strong>Report Date:</strong> ${today}</li>
+                            <li><strong>Total Records:</strong> ${csvContent.split('\n').length - 2}</li>
+                        </ul>
+                        <p>Best regards,<br>Game Stop Management System</p>
+                    </div>
+                `,
+                text: `Dear Team,\n\nPlease find the daily activity report attached.\n\nReport Date: ${today}\nTotal Records: ${csvContent.split('\n').length - 2}\n\nBest regards,\nGame Stop Management System`,
+                attachments: [
+                    {
+                        name: `gamestop_history_${today}.csv`,
+                        content: base64Csv,
+                        type: 'text/csv'
+                    }
+                ]
+            }
         };
 
-        // Make the API call to MailerSend directly
-        const response = await fetch('https://api.mailersend.com/v1/email', {
+        // Step 4: Send email using SendPulse SMTP service
+        const response = await fetch('https://api.sendpulse.com/smtp/emails', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`
+                'Authorization': `Bearer ${accessToken}`
             },
             body: JSON.stringify(emailPayload)
         });
 
-        console.log('Response status:', response.status);
+        console.log('SendPulse response status:', response.status);
         
-        // If MailerSend reports an error, handle it
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('MailerSend API Error:', errorData);
+            console.error('SendPulse API Error:', errorData);
             throw new Error(`Email failed: ${errorData.message || 'Unknown error'}`);
         }
 
         const result = await response.json();
-        console.log('Email sent successfully!', result);
-        return { success: true, message: "Email sent successfully!", data: result };
+        console.log('Email sent successfully via SendPulse!', result);
+        return { success: true, message: "Email sent successfully via SendPulse!", data: result };
         
     } catch (error) {
         console.error('Email sending failed:', error);
