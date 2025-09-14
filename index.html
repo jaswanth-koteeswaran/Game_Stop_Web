@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Stop - The Vanguard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+        }
+        .hidden {
+            display: none;
+        }
+
+        /* --- Customer View Styles --- */
+        #customer-view {
+            background-color: #0c0a09; /* Even darker stone background */
+        }
+        .hero-section {
+            background-image: linear-gradient(rgba(12, 10, 9, 0.8), rgba(12, 10, 9, 1)), url('https://placehold.co/1920x1080/0c0a09/eab308?text=Game+On!');
+            background-size: cover;
+            background-position: center;
+        }
+        .customer-card {
+            background-color: #1c1917; /* Darker stone */
+            border: 1px solid #44403c; /* Stone border */
+            border-radius: 0.75rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .customer-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 25px rgba(234, 179, 8, 0.2);
+        }
+        .btn-primary {
+            background-color: #eab308; /* Amber */
+            color: #1c1917;
+            font-weight: 700;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .btn-primary:hover {
+            background-color: #f59e0b;
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.5);
+        }
+        .form-input, .form-select {
+            background-color: #292524;
+            border: 1px solid #57534e;
+            color: #f3f4f6;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            transition: border-color 0.2s;
+            width: 100%;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #eab308;
+            box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.4);
+        }
+        .modal-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 50;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-backdrop.show { opacity: 1; visibility: visible; }
+        .modal-content {
+            background-color: #1c1917; padding: 2rem; border-radius: 0.75rem; border: 1px solid #44403c;
+            width: 90%; max-width: 500px; transform: scale(0.9); transition: transform 0.3s ease;
+        }
+        .modal-backdrop.show .modal-content { transform: scale(1); }
+
+        /* --- Admin View Styles --- */
+        #admin-view {
+            background-color: #111827;
+            padding: 1.5rem;
+        }
+        #login-modal {
+            background-color: rgba(17, 24, 39, 0.95);
+        }
+        .admin-card {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.75rem;
+        }
+        .admin-btn {
+            display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem;
+            border-radius: 0.5rem; font-weight: 500; transition: all 0.2s ease-in-out; cursor: pointer; border: 1px solid transparent;
+        }
+        .admin-btn-primary { background-color: #4f46e5; color: white; }
+        .admin-btn-primary:hover { background-color: #4338ca; }
+        .admin-btn-secondary { background-color: #374151; color: #d1d5db; }
+        .admin-btn-secondary:hover { background-color: #4b5563; }
+        .admin-btn-danger { background-color: #dc2626; color: white; }
+        .admin-btn-danger:hover { background-color: #b91c1c; }
+        .admin-btn-success { background-color: #16a34a; color: white; }
+        .admin-btn-success:hover { background-color: #15803d; }
+        .admin-form-input, .admin-form-select {
+            width: 100%; background-color: #374151; border: 1px solid #4b5563; color: #f3f4f6;
+            border-radius: 0.5rem; padding: 0.6rem 0.8rem; transition: border-color 0.2s;
+        }
+        .admin-form-input:focus, .admin-form-select:focus {
+            outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
+        }
+        .notification-toast {
+            position: fixed; top: 1.5rem; right: 1.5rem; background-color: #10b981; color: white;
+            padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translateX(120%); transition: transform 0.5s ease-in-out; z-index: 100;
+        }
+        .notification-toast.show { transform: translateX(0); }
+        .times-up { animation: flash-red 1.5s infinite; }
+        @keyframes flash-red {
+            0%, 100% { background-color: #b91c1c; border-color: #f87171; }
+            50% { background-color: #1f2937; border-color: #374151; }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- =========== LOGIN MODAL FOR ADMIN =========== -->
+    <div id="login-modal" class="fixed top-0 left-0 w-full h-full flex items-center justify-center z-50 hidden">
+        <div class="admin-card p-8 rounded-lg shadow-xl w-full max-w-sm">
+            <h2 class="text-3xl font-bold text-center text-white mb-6">Admin Login</h2>
+            <form id="login-form">
+                <div class="space-y-4">
+                    <input type="text" id="username" class="admin-form-input text-lg" placeholder="Username" required>
+                    <input type="password" id="password" class="admin-form-input text-lg" placeholder="Password" required>
+                </div>
+                <button type="submit" class="admin-btn admin-btn-primary w-full mt-6 text-lg">Login</button>
+                <p id="login-error" class="text-red-400 text-center text-sm mt-4 h-5"></p>
+            </form>
+             <button id="close-login-modal" class="text-gray-400 hover:text-white transition absolute top-4 right-4">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- =========== CUSTOMER VIEW =========== -->
+    <div id="customer-view">
+        <header class="bg-black/50 backdrop-blur-sm fixed top-0 left-0 right-0 z-40 border-b border-stone-800">
+             <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                <h1 class="text-6xl font-black tracking-wider text-amber-400">GAME STOP</h1>
+                <nav class="hidden md:flex space-x-6 items-center">
+                    <a href="#games" class="text-gray-300 hover:text-amber-400 transition">Games</a>
+                    <a href="#menu" class="text-gray-300 hover:text-amber-400 transition">Food Menu</a>
+                    <a href="#contact" class="text-gray-300 hover:text-amber-400 transition">Contact</a>
+                    <a href="#booking" class="btn-primary !px-6 !py-2">Book Now</a>
+                </nav>
+            </div>
+        </header>
+        <main>
+            <section class="hero-section h-screen flex items-center justify-center text-center">
+                 <div class="container mx-auto px-6">
+                    <h2 class="text-4xl md:text-5xl font-black text-white uppercase tracking-widest">Manali New Town</h2>
+                    <h1 class="text-7xl md:text-9xl font-black text-amber-400 uppercase tracking-widest mt-2">Gaming Cafe</h1>
+                    <h4 class="text-gray-100 mt-6 max-w-7xl mx-auto text-white uppercase tracking-widest">Discover the True Fun and Entertainment with your Friends and Families here ! </h4>
+                    <a href="#booking" class="btn-primary mt-10 inline-block">Book your Slots !</a>
+                </div>
+            </section>
+            <section id="games" class="py-20 bg-stone-900">
+                <div class="container mx-auto px-6">
+                    <h2 class="text-4xl font-bold text-center mb-12">Gaming Powerhouse</h2>
+                    <div id="games-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <!-- Game cards will be inserted here by JavaScript -->
+                    </div>
+                </div>
+            </section>
+            <section id="booking" class="py-20">
+                <div class="container mx-auto px-6">
+                    <h2 class="text-4xl font-bold text-center mb-4">Book Your Slot</h2>
+                    <p class="text-center text-gray-400 mb-12 max-w-2xl mx-auto">Fill out the form below to request a time. We'll call you back to confirm your booking. No payment needed now!</p>
+                    <form id="booking-form" class="customer-card max-w-3xl mx-auto p-8 space-y-6">
+                        <div>
+                            <label for="customer-name" class="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
+                            <input type="text" id="customer-name" class="form-input" required>
+                        </div>
+                        <div>
+                            <label for="customer-phone" class="block text-sm font-medium text-gray-300 mb-1">Phone Number (for confirmation)</label>
+                            <input type="tel" id="customer-phone" class="form-input" required>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="game-select" class="block text-sm font-medium text-gray-300 mb-1">Choose Your Game</label>
+                                <select id="game-select" class="form-select" required></select>
+                            </div>
+                            <div>
+                                <label for="date-select" class="block text-sm font-medium text-gray-300 mb-1">Select Date</label>
+                                <input type="date" id="date-select" class="form-input" required>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="time-select" class="block text-sm font-medium text-gray-300 mb-1">Preferred Start Time</label>
+                                <select id="time-select" class="form-select" required></select>
+                            </div>
+                            <div>
+                                <label for="duration-select" class="block text-sm font-medium text-gray-300 mb-1">Select Duration</label>
+                                <select id="duration-select" class="form-select" required>
+                                    <!-- Options populated by JS -->
+                                </select>
+                            </div>
+                        </div>
+                        <div id="members-select-wrapper" class="grid grid-cols-1">
+                             <div>
+                                <label for="members-select" class="block text-sm font-medium text-gray-300 mb-1">Number of Players</label>
+                                <select id="members-select" class="form-select" required></select>
+                            </div>
+                        </div>
+                        <div class="mt-6 text-center">
+                            <p class="text-gray-400 text-lg">Total Price</p>
+                            <p id="price-display" class="text-amber-400 text-4xl font-bold">Rs. 0</p>
+                        </div>
+                         <div>
+                            <button type="submit" id="submit-btn" class="btn-primary w-full mt-4">
+                                <span id="submit-btn-text">Send Booking Request</span>
+                                <span id="submit-btn-spinner" class="hidden animate-spin">◓</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+            <section id="menu" class="py-20 bg-stone-900">
+                <div class="container mx-auto px-6">
+                    <h2 class="text-4xl font-bold text-center mb-12">Fuel Up!</h2>
+                    <div id="food-list" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"></div>
+                </div>
+            </section>
+            <section id="contact" class="py-20 text-center">
+                 <div class="container mx-auto px-6">
+                    <h2 class="text-4xl font-bold text-center mb-4">Get In Touch</h2>
+                    <p class="text-gray-400 mb-4"><strong>Address:</strong> #51/17, 1st Floor, Near Thiruvalluvar Statue, Opp. to Axis ATM, Manali New Town, Chennai - 600 103</p>
+                    <p class="text-gray-400 mb-4"><strong>Phone:</strong> 99529 83813, 63824 68421, 81224 85224</p>
+                    <p class="text-gray-400 mb-4"><strong>Email:</strong> gamestopchennai@gmail.com</p>
+                    <div class="flex justify-center items-center space-x-8 mt-6">
+                        <a href="https://www.instagram.com/vanguard_game_stop" target="_blank" class="text-gray-400 hover:text-white transition flex items-center space-x-2" aria-label="Instagram">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.316 1.363.364 2.427.048 1.024.06 1.378.06 3.808s-.012 2.784-.06 3.808c-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.316-2.427.364-1.024.048-1.378.06-3.808.06s-2.784-.012-3.808-.06c-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.316-1.363-.364-2.427C2.013 15.093 2 14.74 2 12.315s.013-2.784.06-3.808c.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.316 2.427-.364C8.907 2.013 9.26 2 11.685 2h.63zM12 6.865a5.155 5.155 0 100 10.31 5.155 5.155 0 000-10.31zm0 8.465a3.31 3.31 0 110-6.62 3.31 3.31 0 010 6.62zm5.706-6.573a1.235 1.235 0 11-2.47 0 1.235 1.235 0 012.47 0z" clip-rule="evenodd" /></svg>
+                            <span class="text-lg">Instagram</span>
+                        </a>
+                        <a href="https://www.youtube.com/@GameStopChennai" target="_blank" class="text-gray-400 hover:text-white transition flex items-center space-x-2" aria-label="YouTube">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M19.812 5.418c.861.23 1.538.907 1.768 1.768C21.998 8.78 22 12 22 12s0 3.22-.42 4.814a2.506 2.506 0 01-1.768 1.768c-1.593.42-7.812.42-7.812.42s-6.219 0-7.812-.42a2.506 2.506 0 01-1.768-1.768C2 15.22 2 12 2 12s0-3.22.42-4.814a2.506 2.506 0 011.768-1.768C5.781 5 12 5 12 5s6.219 0 7.812.418zM9.544 15.568V8.432L15.334 12l-5.79 3.568z" clip-rule="evenodd" /></svg>
+                            <span class="text-lg">YouTube</span>
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer class="bg-stone-900 border-t border-stone-800 py-6 text-center">
+            <p class="text-gray-400">&copy; 2025 Game Stop The Vanguard | <a href="#" id="show-admin-link" class="hover:text-amber-400">Admin Panel</a></p>
+        </footer>
+        <div id="success-modal" class="modal-backdrop">
+            <div class="modal-content text-center">
+                <svg class="w-16 h-16 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <h3 class="text-2xl font-bold mt-4 text-white">Request Sent!</h3>
+                <p class="text-gray-300 mt-2">Thank you! We've received your booking request. It is now pending approval in the Admin Panel.</p>
+                <button id="close-modal-btn" class="btn-primary mt-6">Awesome!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========== ADMIN VIEW =========== -->
+    <div id="admin-view" class="hidden">
+        <div class="max-w-7xl mx-auto ">
+            <header class="flex justify-between items-center mb-8">
+                <button id="show-customer-link" class="text-indigo-400 hover:text-indigo-300">← Back to Customer Site</button>
+                <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white">Game Stop - Admin Panel</h1>
+                <button id="logout-btn" class="admin-btn admin-btn-danger">Logout</button>
+            </header>
+            <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-1 space-y-8">
+                    <!-- Game Booking Card -->
+                    <div class="admin-card p-6">
+                        <h2 class="text-2xl font-semibold mb-4 text-indigo-400">Book a Game (Walk-in)</h2>
+                        <form id="game-booking-form" class="space-y-4">
+                            <input type="text" id="admin-customer-name-game" class="admin-form-input" placeholder="Customer Name" required>
+                            <select id="admin-game-select" class="admin-form-select" required></select>
+                            <select id="admin-duration-select" class="admin-form-select" required>
+                                <!-- Options populated by JS -->
+                            </select>
+                            <div id="admin-members-select-wrapper" class="hidden">
+                                <select id="admin-members-select" class="admin-form-select"></select>
+                            </div>
+                            <input type="number" id="admin-game-price" class="admin-form-input" placeholder="Price" min="0" required>
+                            <select id="admin-payment-method-game" class="admin-form-select" required>
+                                <option>QR Payment</option>
+                                <option>Cash</option>
+                            </select>
+                            <button type="submit" class="admin-btn admin-btn-primary w-full">Start Session</button>
+                        </form>
+                    </div>
+                    <!-- Food Order Card -->
+                    <div class="admin-card p-6">
+                        <h2 class="text-2xl font-semibold mb-4 text-amber-400">Place a Food Order</h2>
+                        <form id="food-order-form" class="space-y-4">
+                            <input type="text" id="admin-customer-name-food" class="admin-form-input" placeholder="Customer / Table Name" required>
+                            <div id="admin-food-items" class="space-y-2 max-h-60 overflow-y-auto pr-2"></div>
+                             <input type="number" id="admin-food-price" class="admin-form-input" placeholder="Total Price" min="0" required>
+                             <select id="admin-payment-method-food" class="admin-form-select" required>
+                                <option>QR Payment</option>
+                                <option>Cash</option>
+                            </select>
+                            <button type="submit" class="admin-btn bg-amber-600 hover:bg-amber-700 text-white w-full">Place Order</button>
+                        </form>
+                    </div>
+                     <!-- End of Day Report Card -->
+                    <div class="admin-card p-6">
+                        <h2 class="text-2xl font-semibold mb-4 text-green-400">End of Day Report</h2>
+                        <p class="text-gray-400 text-sm mb-4">This will email the daily history report and clear all data for the next day. Use this button only once at the end of your business day.</p>
+                        <button id="end-of-day-btn" class="admin-btn admin-btn-success w-full">Send Report & Reset Day</button>
+                    </div>
+                </div>
+                <div class="lg:col-span-2 space-y-8">
+                     <!-- Pending Customer Bookings -->
+                    <div class="admin-card p-6">
+                        <h2 class="text-2xl font-semibold text-green-400 mb-4">Pending Customer Bookings</h2>
+                        <div id="pending-bookings-container" class="space-y-4">
+                            <p class="text-gray-400 text-center py-8">No pending booking requests.</p>
+                        </div>
+                    </div>
+                    <!-- Active Game Sessions -->
+                    <div class="admin-card p-6">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h2 class="text-2xl font-semibold text-indigo-400">Active Game Sessions</h2>
+                            <button id="export-csv" class="admin-btn admin-btn-secondary">Export History (CSV)</button>
+                        </div>
+                        <div id="active-sessions-container" class="space-y-4">
+                             <p class="text-gray-400 text-center py-8">No active game sessions.</p>
+                        </div>
+                    </div>
+                    <!-- Active Food Orders -->
+                    <div class="admin-card p-6">
+                         <h2 class="text-2xl font-semibold text-amber-400 mb-4">Pending Food Orders</h2>
+                         <div id="food-orders-container" class="space-y-4">
+                             <p class="text-gray-400 text-center py-8">No pending food orders.</p>
+                         </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+        <div id="notification-toast" class="notification-toast">
+            <strong id="notification-message"></strong>
+        </div>
+    </div>
+    
+<script type="module">
+    // --- ADMIN CREDENTIALS & SETTINGS ---
+    const ADMIN_USERNAME = 'gamestop';
+    const ADMIN_PASSWORD = 'gs@123';
+
+    // --- PRICING DATA ---
+    const priceConfig = {
+        'PS4': { '1': 80, '2': 100, '3': 120, '4': 140 }, // Per hour
+        'PS5': { '1': 120, '2': 150, '3': 180, '4': 200 }, // Per hour
+        'VR': { '15': 50, '30': 90, '60': 180 },
+        'Racing Driving Wheel': { '30': 50, '60': 100 },
+        'Snooker': { 'perHour': 200 }, // Per hour
+        'thirtyMinSurcharge': 20
+    };
+
+    // --- DATA ---
+    // IMPORTANT: To add your own images, replace the placeholder URLs below with the path to your image file.
+    // Example: { name: 'PS5', image: 'images/ps5.jpg' }, 
+    const gamesData = [
+        { name: 'PS5', image: '/images/ps5.png' }, 
+        { name: 'PS4', image: '/images/ps4.png' },
+        { name: 'Racing Driving Wheel', image: '/images/car.png' }, 
+        { name: 'VR', image: '/images/vr.png' }, 
+        { name: 'Snooker', image: '/images/snooker.png' }
+    ];
+    
+    const customerFoodData = [
+        { name: 'French Fries @ ₹ 60', price: 60, image: '/images/fries.png' },
+        { name: 'Peri Peri French Fries @ ₹ 70', price: 70, image: '/images/fries.png' },
+        { name: 'Chicken Cheese Balls (6pcs) @ ₹ 100', price: 100, image: '/images/cheese.png' },
+        { name: 'Chicken Nuggets (6pcs) @ ₹ 100', price: 100, image: '/images/nuggets.png' },
+        { name: 'Chicken Popcorn Small (12-15pcs) @ ₹ 100', price: 100, image: '/images/popcorn.png' },
+        { name: 'Chicken Popcorn Large (5-7pcs) @ ₹ 100', price: 100, image: '/images/popcorn.png' },
+        { name: 'Fried Chicken Momos (5pcs) @ ₹ 100', price: 100, image: '/images/momos.png' },
+        { name: 'Szechuan Fried Chicken Momos (5pcs) @ ₹ 120', price: 120, image: '/images/momos.png' },
+        { name: 'Soft Drinks @ ₹ 10', price: 10, image: '/images/drink.png' }
+    ];
+
+    const adminFoodData = [
+        ...customerFoodData,
+        { name: 'Chicken Wings (6pcs)', price: 150, image: '/images/wings.png' },
+        { name: 'Chocolates', price: 0, image: 'https://placehold.co/400x300/1c1917/eab308?text=Chocolate' } // Price varies
+    ];
+
+
+    // --- VIEW MANAGEMENT & AUTH ---
+    const customerView = document.getElementById('customer-view');
+    const adminView = document.getElementById('admin-view');
+    const loginModal = document.getElementById('login-modal');
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+    const showAdminLink = document.getElementById('show-admin-link');
+    const showCustomerLink = document.getElementById('show-customer-link');
+    const logoutBtn = document.getElementById('logout-btn');
+    const closeLoginModalBtn = document.getElementById('close-login-modal');
+    
+    let adminInitialized = false;
+
+    function showView(viewName) {
+        if (viewName === 'admin' && sessionStorage.getItem('isAdminAuthenticated') === 'true') {
+            customerView.classList.add('hidden');
+            loginModal.classList.add('hidden');
+            adminView.classList.remove('hidden');
+            if (!adminInitialized) {
+                initAdminView();
+                adminInitialized = true;
+            }
+        } else {
+            adminView.classList.add('hidden');
+            customerView.classList.remove('hidden');
+        }
+    }
+
+    // --- MAIN INITIALIZATION ---
+    function main() {
+        initCustomerView();
+        
+        if (sessionStorage.getItem('isAdminAuthenticated') === 'true' && window.location.hash === '#admin') {
+            showView('admin');
+        } else if (window.location.hash === '#admin') {
+            loginModal.classList.remove('hidden');
+        }
+    }
+
+    function calculatePrice(game, duration, members) {
+        let price = 0;
+        if (!game || !duration) return 0;
+
+        duration = parseInt(duration);
+        members = parseInt(members);
+
+        const gamePrices = priceConfig[game];
+
+        if (game === 'PS4' || game === 'PS5') {
+            if (members && gamePrices[members]) {
+                price = gamePrices[members] * (duration / 60);
+            }
+        } else if (game === 'Snooker') {
+            if (members && gamePrices.perHour) {
+                price = gamePrices.perHour * (duration / 60);
+            }
+        } else if (game === 'Racing Driving Wheel' || game === 'VR') {
+             if (gamePrices[duration]) {
+                price = gamePrices[duration];
+            } else {
+                // Fallback for durations not explicitly priced (e.g., 45, 75 mins)
+                const hourlyRate = gamePrices['60'] || (game === 'VR' ? 180 : 100);
+                price = (hourlyRate / 60) * duration;
+            }
+        }
+
+        if (duration === 30 && game !== 'VR' && game !== 'Racing Driving Wheel') {
+             price += priceConfig.thirtyMinSurcharge;
+        }
+
+        return price.toFixed(0);
+    }
+
+    // ===========================================
+    //         CUSTOMER VIEW LOGIC
+    // ===========================================
+    function initCustomerView() {
+        const gamesListContainer = document.getElementById('games-list');
+        const foodListContainer = document.getElementById('food-list');
+        const gameSelect = document.getElementById('game-select');
+        const dateSelect = document.getElementById('date-select');
+        const timeSelect = document.getElementById('time-select');
+        const durationSelect = document.getElementById('duration-select');
+        const membersSelectWrapper = document.getElementById('members-select-wrapper');
+        const membersSelect = document.getElementById('members-select');
+        const priceDisplay = document.getElementById('price-display');
+        const bookingForm = document.getElementById('booking-form');
+        const successModal = document.getElementById('success-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const submitBtnText = document.getElementById('submit-btn-text');
+        const submitBtnSpinner = document.getElementById('submit-btn-spinner');
+
+        gamesData.forEach(game => {
+            const card = document.createElement('div');
+            card.className = 'customer-card p-6 text-center';
+            card.innerHTML = `<img src="${game.image}" alt="${game.name}" class="w-full h-48 object-contain mb-4 rounded-lg bg-stone-800"><h3 class="text-2xl font-bold text-amber-400">${game.name}</h3>`;
+            gamesListContainer.appendChild(card);
+        });
+
+        customerFoodData.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'customer-card p-4 text-center';
+            card.innerHTML = `<img src="${item.image}" alt="${item.name}" class="w-full h-32 object-contain mb-2 rounded-lg bg-stone-800"><p class="font-semibold text-gray-200">${item.name}</p>`;
+            foodListContainer.appendChild(card);
+        });
+        
+        gameSelect.innerHTML = '<option value="" disabled selected>Select a game...</option>';
+        gamesData.forEach(game => {
+            const option = document.createElement('option');
+            option.value = game.name;
+            option.textContent = game.name;
+            gameSelect.appendChild(option);
+        });
+    
+        timeSelect.innerHTML = '';
+        for (let hour = 10; hour < 22; hour++) {
+            for (let min of ['00', '30']) {
+                const time = `${String(hour).padStart(2, '0')}:${min}`;
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = `${hour % 12 === 0 ? 12 : hour % 12}:${min} ${hour < 12 ? 'AM' : 'PM'}`;
+                timeSelect.appendChild(option);
+            }
+        }
+        
+        const setMinDate = () => {
+            const today = new Date().toISOString().split('T')[0];
+            dateSelect.setAttribute('min', today);
+        };
+        setMinDate();
+
+        function updateCustomerPrice() {
+            const price = calculatePrice(gameSelect.value, durationSelect.value, membersSelect.value);
+            priceDisplay.textContent = `Rs. ${price}`;
+        }
+
+        function onCustomerGameChange() {
+            const game = gameSelect.value;
+            
+            // --- Duration Logic ---
+            durationSelect.innerHTML = ''; // Clear existing options
+            let durationOptions = [
+                { value: '30', text: '30 minutes' },
+                { value: '60', text: '1 hour' },
+                { value: '90', text: '1.5 hours' },
+                { value: '120', text: '2 hours' },
+                { value: '180', text: '3 hours' },
+                { value: '240', text: '4 hours' },
+            ];
+            
+            if (game === 'VR') {
+                durationOptions = [
+                    { value: '15', text: '15 minutes' },
+                    { value: '30', text: '30 minutes' },
+                    { value: '60', text: '1 hour' },
+                ];
+            } else if (game === 'Racing Driving Wheel') {
+                durationOptions = [
+                    { value: '30', text: '30 minutes' },
+                    { value: '60', text: '1 hour' },
+                ];
+            }
+            
+            durationOptions.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                durationSelect.appendChild(option);
+            });
+            
+            // --- Members Logic ---
+            let showMembers = false;
+            let memberOptions = [];
+
+            if (game === 'PS4' || game === 'PS5') {
+                showMembers = true;
+                memberOptions = [1, 2, 3, 4];
+            } else if (game === 'Snooker') {
+                showMembers = true;
+                memberOptions = [2, 3, 4];
+            }
+            
+            if(showMembers){
+                membersSelectWrapper.classList.remove('hidden');
+                membersSelect.innerHTML = '';
+                memberOptions.forEach(num => {
+                    const option = document.createElement('option');
+                    option.value = num;
+                    option.textContent = `${num} Player${num > 1 ? 's' : ''}`;
+                    membersSelect.appendChild(option);
+                });
+            } else {
+                membersSelectWrapper.classList.add('hidden');
+            }
+            
+            updateCustomerPrice();
+        }
+        
+        gameSelect.addEventListener('change', onCustomerGameChange);
+        durationSelect.addEventListener('change', updateCustomerPrice);
+        membersSelect.addEventListener('change', updateCustomerPrice);
+        onCustomerGameChange();
+
+        bookingForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            setLoading(true);
+
+            const bookingData = {
+                id: `booking-${Date.now()}`,
+                customerName: document.getElementById('customer-name').value,
+                customerPhone: document.getElementById('customer-phone').value,
+                game: gameSelect.value,
+                date: dateSelect.value,
+                startTime: timeSelect.value,
+                duration: durationSelect.value,
+                members: membersSelect.value,
+                price: parseFloat(priceDisplay.textContent.replace('Rs. ', '')),
+                status: 'pending'
+            };
+
+            const existingBookings = JSON.parse(localStorage.getItem('pendingBookings')) || [];
+            existingBookings.push(bookingData);
+            localStorage.setItem('pendingBookings', JSON.stringify(existingBookings));
+            window.dispatchEvent(new CustomEvent('storageUpdate'));
+
+            bookingForm.reset();
+            setMinDate();
+            onCustomerGameChange();
+            successModal.classList.add('show');
+            setLoading(false);
+        });
+
+        closeModalBtn.addEventListener('click', () => successModal.classList.remove('show'));
+        successModal.addEventListener('click', (e) => {
+             if (e.target === successModal) successModal.classList.remove('show');
+        });
+        
+        function setLoading(isLoading) {
+            submitBtn.disabled = isLoading;
+            submitBtnText.classList.toggle('hidden', isLoading);
+            submitBtnSpinner.classList.toggle('hidden', !isLoading);
+        }
+    }
+
+    // ===========================================
+    //           ADMIN VIEW LOGIC
+    // ===========================================
+    function initAdminView() {
+        let activeSessions = [];
+        let foodOrders = [];
+        let history = [];
+        let nextSessionId = 1;
+        let nextOrderId = 1;
+        let synth;
+
+        const gameBookingForm = document.getElementById('game-booking-form');
+        const foodOrderForm = document.getElementById('food-order-form');
+        const activeSessionsContainer = document.getElementById('active-sessions-container');
+        const foodOrdersContainer = document.getElementById('food-orders-container');
+        const adminFoodItemsContainer = document.getElementById('admin-food-items');
+        const exportBtn = document.getElementById('export-csv');
+        const notificationToast = document.getElementById('notification-toast');
+        const notificationMessage = document.getElementById('notification-message');
+        const pendingBookingsContainer = document.getElementById('pending-bookings-container');
+        const adminGameSelect = document.getElementById('admin-game-select');
+        const adminDurationSelect = document.getElementById('admin-duration-select');
+        const adminMembersSelectWrapper = document.getElementById('admin-members-select-wrapper');
+        const adminMembersSelect = document.getElementById('admin-members-select');
+        const adminGamePriceInput = document.getElementById('admin-game-price');
+        const endOfDayBtn = document.getElementById('end-of-day-btn');
+        
+        document.body.addEventListener('click', () => { if (!synth) synth = new Tone.Synth().toDestination(); }, { once: true });
+        
+        adminGameSelect.innerHTML = '<option value="" disabled selected>Choose a game...</option>';
+        gamesData.forEach(game => {
+            const option = document.createElement('option');
+            option.value = game.name;
+            option.textContent = game.name;
+            adminGameSelect.appendChild(option);
+        });
+
+        adminFoodItemsContainer.innerHTML = '';
+        adminFoodData.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between bg-gray-700 p-2 rounded-md';
+            const priceText = item.price > 0 ? ` - Rs. ${item.price}` : ' (Price Varies)';
+            div.innerHTML = `<label for="admin-food-${item.name.replace(/\s+/g, '-')}" class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="admin-food-${item.name.replace(/\s+/g, '-')}" name="food-item" value="${item.name}" data-price="${item.price}" class="h-4 w-4 rounded bg-gray-800 border-gray-600 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-3 text-sm text-gray-200">${item.name}${priceText}</span>
+                             </label>
+                             <input type="number" min="1" value="1" class="admin-form-input w-20 text-center p-1 h-8 quantity-input" disabled>`;
+            adminFoodItemsContainer.appendChild(div);
+        });
+
+        function updateAdminFoodPrice() {
+            let totalPrice = 0;
+            adminFoodItemsContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+                const price = parseFloat(checkbox.dataset.price);
+                const quantityInput = checkbox.closest('div').querySelector('.quantity-input');
+                const quantity = parseInt(quantityInput.value) || 1;
+                totalPrice += price * quantity;
+            });
+            document.getElementById('admin-food-price').value = totalPrice.toFixed(0);
+        }
+
+        adminFoodItemsContainer.addEventListener('change', (e) => {
+            if (e.target.type === 'checkbox') {
+                e.target.closest('div').querySelector('.quantity-input').disabled = !e.target.checked;
+                updateAdminFoodPrice();
+            }
+        });
+
+        adminFoodItemsContainer.addEventListener('input', (e) => {
+             if (e.target.classList.contains('quantity-input')) {
+                updateAdminFoodPrice();
+            }
+        });
+        
+        setInterval(updateAllTimers, 1000);
+        
+        window.addEventListener('storageUpdate', () => {
+            showNotification("New customer booking request received!");
+            renderPendingBookings();
+        });
+        
+        renderPendingBookings();
+        
+        function updateAdminPrice() {
+            const price = calculatePrice(adminGameSelect.value, adminDurationSelect.value, adminMembersSelect.value);
+            adminGamePriceInput.value = price;
+        }
+
+        function onAdminGameChange() {
+            const game = adminGameSelect.value;
+            
+            // --- Duration Logic ---
+            adminDurationSelect.innerHTML = ''; // Clear existing options
+            let durationOptions = [
+                { value: '30', text: '30 minutes' },
+                { value: '60', text: '1 hour' },
+                { value: '90', text: '1.5 hours' },
+                { value: '120', text: '2 hours' },
+                { value: '240', text: '4 hours' },
+            ];
+
+            if (game === 'VR') {
+                durationOptions = [
+                    { value: '15', text: '15 minutes' },
+                    { value: '30', text: '30 minutes' },
+                    { value: '60', text: '1 hour' },
+                ];
+            } else if (game === 'Racing Driving Wheel') {
+                durationOptions = [
+                    { value: '30', text: '30 minutes' },
+                    { value: '60', text: '1 hour' },
+                ];
+            }
+            
+            durationOptions.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                adminDurationSelect.appendChild(option);
+            });
+
+            // --- Members Logic ---
+            let showMembers = false;
+            let options = [];
+
+            if (game === 'PS4' || game === 'PS5') {
+                showMembers = true;
+                options = [1, 2, 3, 4];
+            } else if (game === 'Snooker') {
+                showMembers = true;
+                options = [2, 3, 4];
+            }
+
+            if (showMembers) {
+                adminMembersSelectWrapper.classList.remove('hidden');
+                adminMembersSelect.innerHTML = '';
+                options.forEach(num => {
+                    const option = document.createElement('option');
+                    option.value = num;
+                    option.textContent = `${num} Player${num > 1 ? 's' : ''}`;
+                    adminMembersSelect.appendChild(option);
+                });
+            } else {
+                adminMembersSelectWrapper.classList.add('hidden');
+            }
+            updateAdminPrice();
+        }
+        
+        adminGameSelect.addEventListener('change', onAdminGameChange);
+        adminDurationSelect.addEventListener('change', updateAdminPrice);
+        adminMembersSelect.addEventListener('change', updateAdminPrice);
+        onAdminGameChange();
+
+        gameBookingForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            startSession({
+                customerName: document.getElementById('admin-customer-name-game').value,
+                game: adminGameSelect.value,
+                durationMinutes: parseInt(adminDurationSelect.value, 10),
+                price: parseFloat(adminGamePriceInput.value) || 0,
+                members: parseInt(adminMembersSelect.value) || 1,
+                paymentMethod: document.getElementById('admin-payment-method-game').value
+            });
+            gameBookingForm.reset();
+            onAdminGameChange();
+        });
+
+        foodOrderForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const customerName = document.getElementById('admin-customer-name-food').value;
+            const price = parseFloat(document.getElementById('admin-food-price').value) || 0;
+            const paymentMethod = document.getElementById('admin-payment-method-food').value;
+            const selectedItems = Array.from(adminFoodItemsContainer.querySelectorAll('input[type="checkbox"]:checked'))
+                .map(cb => ({ name: cb.value, quantity: parseInt(cb.closest('div').querySelector('.quantity-input').value, 10) }));
+            if (!customerName || selectedItems.length === 0) return;
+
+            foodOrders.push({ id: nextOrderId++, customerName, items: selectedItems, orderTime: new Date(), price, paymentMethod });
+            renderFoodOrders();
+            foodOrderForm.reset();
+            adminFoodItemsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            adminFoodItemsContainer.querySelectorAll('input[type="number"]').forEach(input => {
+                input.value = '1';
+                input.disabled = true;
+            });
+            updateAdminFoodPrice();
+        });
+
+        exportBtn.addEventListener('click', exportHistoryToCSV);
+        
+        function startSession(sessionData) {
+             const now = new Date();
+             activeSessions.push({
+                id: nextSessionId++, ...sessionData,
+                startTime: now, endTime: new Date(now.getTime() + sessionData.durationMinutes * 60 * 1000),
+                notified: false
+            });
+            renderActiveSessions();
+        }
+        
+        function renderPendingBookings() {
+            const bookings = JSON.parse(localStorage.getItem('pendingBookings')) || [];
+            pendingBookingsContainer.innerHTML = bookings.length === 0 ? '<p class="text-gray-400 text-center py-8">No pending booking requests.</p>' : '';
+            bookings.forEach(b => {
+                const card = document.createElement('div');
+                card.className = 'admin-card p-4';
+                card.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div>
+                            <p class="font-bold text-white">${b.customerName} (${b.customerPhone})</p>
+                            <p class="text-sm text-gray-300">${b.game} (${b.members} players) on ${b.date} at ${b.startTime}</p>
+                            <p class="font-semibold text-green-400">Quoted Price: Rs. ${b.price}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="admin-btn admin-btn-success text-xs" data-booking-id='${JSON.stringify(b)}' data-action="confirm">Confirm & Start</button>
+                            <button class="admin-btn admin-btn-danger text-xs" data-booking-id='${JSON.stringify(b)}' data-action="reject">Reject</button>
+                        </div>
+                    </div>`;
+                pendingBookingsContainer.appendChild(card);
+            });
+        }
+        
+        function renderActiveSessions() {
+            activeSessionsContainer.innerHTML = activeSessions.length === 0 ? '<p class="text-gray-400 text-center py-8">No active game sessions.</p>' : '';
+            activeSessions.sort((a,b) => a.endTime - b.endTime).forEach(session => {
+                const timeRemaining = session.endTime - Date.now();
+                const isTimeUp = timeRemaining <= 0;
+                const card = document.createElement('div');
+                card.className = `admin-card p-4 flex flex-col md:flex-row justify-between items-center gap-4 ${isTimeUp ? 'times-up' : ''}`;
+                card.id = `session-${session.id}`;
+                card.innerHTML = `
+                    <div>
+                        <p class="text-xl font-bold">${session.customerName}</p>
+                        <p class="text-indigo-300">${session.game}</p>
+                        <p class="text-sm text-green-400 font-semibold">Price: ${session.price.toFixed(2)}</p>
+                    </div>
+                    <div><p class="text-3xl font-mono font-bold ${isTimeUp ? 'text-red-500' : 'text-green-400'}" data-timer-id="${session.id}">${formatTime(Math.max(0, timeRemaining))}</p></div>
+                    <div class="flex gap-2"><button class="admin-btn admin-btn-secondary text-xs" data-session-id="${session.id}" data-action="add-time">+15m</button><button class="admin-btn admin-btn-secondary text-xs" data-session-id="${session.id}" data-action="sub-time">-15m</button><button class="admin-btn admin-btn-danger text-xs" data-session-id="${session.id}" data-action="end">End</button></div>`;
+                activeSessionsContainer.appendChild(card);
+            });
+        }
+        
+        function renderFoodOrders() {
+            foodOrdersContainer.innerHTML = foodOrders.length === 0 ? '<p class="text-gray-400 text-center py-8">No pending food orders.</p>' : '';
+            foodOrders.forEach(order => {
+                const card = document.createElement('div');
+                card.className = 'admin-card p-4';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-lg font-bold text-white">${order.customerName}</p>
+                            <ul class="text-sm text-amber-200 list-disc list-inside mt-1">${order.items.map(item => `<li>${item.quantity} x ${item.name}</li>`).join('')}</ul>
+                            <p class="text-sm text-green-400 font-semibold mt-2">Total Price: ${order.price.toFixed(2)}</p>
+                        </div>
+                        <button class="admin-btn admin-btn-success text-xs" data-order-id="${order.id}" data-action="complete-order">Complete</button>
+                    </div>`;
+                foodOrdersContainer.appendChild(card);
+            });
+        }
+
+        function updateAllTimers() {
+            activeSessions.forEach(session => {
+                const timerElement = document.querySelector(`[data-timer-id="${session.id}"]`);
+                if (timerElement) {
+                    const timeRemaining = session.endTime - Date.now();
+                    timerElement.textContent = formatTime(Math.max(0, timeRemaining));
+                    if (timeRemaining <= 0 && !session.notified) {
+                        session.notified = true;
+                        showNotification(`${session.customerName}'s time for ${session.game} is up!`);
+                        playTimeOverAlert();
+                        renderActiveSessions();
+                    }
+                }
+            });
+        }
+        
+        function playTimeOverAlert() {
+            if ('speechSynthesis' in window) {
+                // Use a loop with a delay to say it 3 times
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance("Time over");
+                        window.speechSynthesis.speak(utterance);
+                    }, i * 1500); // Speak every 1.5 seconds
+                }
+            } else {
+                console.log("Speech synthesis not supported. Playing tone instead.");
+                if (synth) synth.triggerAttackRelease("C5", "0.5s", Tone.now());
+            }
+        }
+        
+        adminView.addEventListener('click', (e) => {
+            const { sessionId, orderId, action } = e.target.dataset;
+            const bookingDataString = e.target.dataset.bookingId;
+
+            if (sessionId) {
+                const session = activeSessions.find(s => s.id === parseInt(sessionId));
+                if (!session) return;
+                
+                if (action === 'add-time' || action === 'sub-time') {
+                    const timeChange = action === 'add-time' ? 15 : -15;
+                    session.endTime = new Date(session.endTime.getTime() + timeChange * 60000);
+                    session.durationMinutes += timeChange;
+                    session.price = parseFloat(calculatePrice(session.game, session.durationMinutes, session.members));
+                    if (session.endTime > Date.now()) {
+                        session.notified = false;
+                    }
+                }
+                 else if (action === 'end') {
+                    const idx = activeSessions.findIndex(s => s.id === parseInt(sessionId));
+                    if (idx > -1) {
+                         const sessionToEnd = activeSessions.splice(idx, 1)[0];
+                        if (!sessionToEnd.paymentMethod || sessionToEnd.paymentMethod === 'Pending') {
+                            const paymentMethod = prompt("Enter payment method (QR Payment / Cash):", "QR Payment");
+                            sessionToEnd.paymentMethod = paymentMethod || "Not specified";
+                        }
+                        addToHistory(sessionToEnd);
+                    }
+                }
+                renderActiveSessions();
+            }
+            if (orderId && action === 'complete-order') {
+                const idx = foodOrders.findIndex(o => o.id === parseInt(orderId));
+                if (idx > -1) {
+                    addToHistory(foodOrders.splice(idx, 1)[0]);
+                    renderFoodOrders();
+                }
+            }
+            if (bookingDataString) {
+                let bookings = JSON.parse(localStorage.getItem('pendingBookings')) || [];
+                const booking = JSON.parse(bookingDataString);
+                if (!booking) return;
+
+                if (action === 'confirm') {
+                    const finalPrice = prompt(`Confirm or change price for ${booking.customerName}'s booking:`, booking.price);
+                    if (finalPrice !== null) { // Check if user clicked cancel
+                        startSession({ 
+                            customerName: booking.customerName, 
+                            game: booking.game, 
+                            durationMinutes: parseInt(booking.duration, 10),
+                            price: parseFloat(finalPrice) || 0,
+                            members: booking.members,
+                            paymentMethod: 'Pending' // Payment will be recorded on session end
+                        });
+                        showNotification(`Started session for ${booking.customerName}.`);
+                    }
+                } else if (action === 'reject') {
+                    showNotification("Booking request rejected.");
+                }
+                
+                localStorage.setItem('pendingBookings', JSON.stringify(bookings.filter(b => b.id !== booking.id)));
+                renderPendingBookings();
+            }
+        });
+
+        function addToHistory(item) {
+            const record = {
+                type: item.game ? 'Game Session' : 'Food Order',
+                customer: item.customerName,
+                details: item.game ? item.game : item.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
+                startTime: (item.startTime || item.orderTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+                endTime: item.game ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : 'N/A',
+                duration: item.durationMinutes ? `${item.durationMinutes} mins` : 'N/A',
+                price: item.price || 0,
+                paymentMethod: item.paymentMethod || 'N/A'
+            };
+            history.push(record);
+            showNotification(`${record.type} for ${record.customer} moved to history.`);
+        }
+
+        function exportHistoryToCSV() {
+            if (history.length === 0) return showNotification("No history to export.");
+            const headers = "Type,Customer,Details,Price,PaymentMethod,StartTime,EndTime,Duration\n";
+            const rows = history.map(r => `"${r.type}","${r.customer}","${r.details}","${r.price.toFixed(2)}","${r.paymentMethod}","${r.startTime}","${r.endTime}","${r.duration}"`).join("\n");
+            
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' }));
+            link.download = `gamestop_history_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        let notificationTimeout;
+        function showNotification(message) {
+            clearTimeout(notificationTimeout);
+            notificationMessage.textContent = message;
+            notificationToast.classList.add('show');
+            notificationTimeout = setTimeout(() => notificationToast.classList.remove('show'), 4000);
+        }
+        function formatTime(ms) {
+            const s = Math.round(ms / 1000);
+            return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+        }
+        
+        async function sendEndOfDayReport() {
+            if (history.length === 0) {
+                showNotification("No history to send.");
+                return;
+            }
+
+            const csvContent = "Type,Customer,Details,Price,PaymentMethod,StartTime,EndTime,Duration\n" + 
+                               history.map(r => `"${r.type}","${r.customer}","${r.details}","${r.price.toFixed(2)}","${r.paymentMethod}","${r.startTime}","${r.endTime}","${r.duration}"`).join("\n");
+            
+            const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+
+            try {
+                const response = await fetch('/.netlify/functions/send-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csvContent, today })
+                });
+
+                if (response.ok) {
+                    showNotification("Daily report sent successfully!");
+                    history = [];
+                    localStorage.removeItem('pendingBookings');
+                    renderPendingBookings();
+                } else {
+                    const errorData = await response.json();
+                    showNotification(`Error sending email: ${errorData.message || 'Check function logs'}`);
+                    console.error('Email sending failed:', errorData);
+                }
+            } catch (error) {
+                showNotification("Failed to send report. Check console.");
+                console.error('Network Error:', error);
+            }
+        }
+        
+        endOfDayBtn.addEventListener('click', () => {
+             if (confirm("Are you sure you want to send the daily report and reset all data? This action cannot be undone.")) {
+                sendEndOfDayReport();
+            }
+        });
+    }
+
+    // --- GLOBAL EVENT LISTENERS & STARTUP ---
+    showAdminLink.addEventListener('click', (e) => { e.preventDefault(); loginModal.classList.remove('hidden'); });
+    showCustomerLink.addEventListener('click', (e) => { e.preventDefault(); window.location.hash = ''; showView('customer'); });
+    logoutBtn.addEventListener('click', () => {
+        sessionStorage.removeItem('isAdminAuthenticated');
+        window.location.hash = '';
+        showView('customer');
+    });
+    loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+            sessionStorage.setItem('isAdminAuthenticated', 'true');
+            window.location.hash = 'admin';
+            showView('admin');
+            loginError.textContent = '';
+            loginForm.reset();
+        } else {
+            loginError.textContent = 'Invalid username or password.';
+        }
+    });
+    closeLoginModalBtn.addEventListener('click', () => loginModal.classList.add('hidden'));
+
+    main();
+
+</script>
+</body>
+</html>
+
